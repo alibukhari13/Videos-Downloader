@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional YouTube Video Downloader</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #ff4b2b;
+            --primary-dark: #ff1a1a;
+            --primary-gradient: linear-gradient(135deg, #ff4b2b, #ff416c);
+            --dark: #121212;
+            --light-dark: #1e1e1e;
+            --card-bg: #1e1e1e;
+            --text: #ffffff;
+            --text-secondary: #b3b3b3;
+            --success: #00c853;
+            --error: #ff5252;
+            --warning: #ffab00;
+            --border-radius: 16px;
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            --card-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--dark), #2c3e50);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            width: 100%;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: var(--primary-gradient);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: var(--shadow);
+        }
+
+        .header h1 {
+            font-size: 2.8rem;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #ff4b2b, #ff416c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .badge {
+            display: inline-block;
+            background: var(--primary-gradient);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-top: 15px;
+        }
+
+        .container {
+            background: rgba(30, 30, 30, 0.8);
+            padding: 35px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+            width: 100%;
+            max-width: 950px;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .input-area {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        input {
+            flex: 1;
+            padding: 18px 20px;
+            border-radius: var(--border-radius);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            background: rgba(30, 30, 30, 0.7);
+            color: var(--text);
+            font-size: 1.1rem;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(255, 75, 43, 0.4);
+            background: rgba(30, 30, 30, 0.9);
+        }
+
+        input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        button {
+            padding: 18px 30px;
+            border-radius: var(--border-radius);
+            border: none;
+            cursor: pointer;
+            background: var(--primary-gradient);
+            color: white;
+            font-weight: bold;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 1.1rem;
+            box-shadow: var(--shadow);
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(255, 75, 43, 0.5);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .loader-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(18, 18, 18, 0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 20px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            border-radius: var(--border-radius);
+        }
+
+        .spinner {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--primary);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loader-text {
+            font-size: 1.3rem;
+            font-weight: 500;
+            letter-spacing: 1px;
+        }
+
+        .loader-sub {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            max-width: 300px;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .video-info {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .video-header {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .video-thumbnail {
+            flex: 0 0 320px;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+
+        .video-thumbnail img {
+            width: 100%;
+            height: auto;
+            display: block;
+            transition: var(--transition);
+        }
+
+        .video-thumbnail:hover img {
+            transform: scale(1.05);
+        }
+
+        .video-thumbnail::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .video-details {
+            flex: 1;
+            min-width: 280px;
+        }
+
+        .video-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+
+        .video-meta {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .action-btn {
+            padding: 15px 25px;
+            border-radius: var(--border-radius);
+            border: none;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-weight: bold;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1rem;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .download-btn {
+            background: var(--success);
+            box-shadow: 0 5px 15px rgba(0, 200, 83, 0.3);
+        }
+
+        .download-btn:hover {
+            background: #00b34a;
+            box-shadow: 0 8px 20px rgba(0, 200, 83, 0.4);
+        }
+
+        .formats-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 25px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .formats-table th,
+        .formats-table td {
+            padding: 18px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .formats-table th {
+            background: rgba(255, 255, 255, 0.08);
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .formats-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .formats-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .quality-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .error-message {
+            color: var(--error);
+            font-weight: 500;
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 82, 82, 0.1);
+            border-radius: var(--border-radius);
+            display: none;
+            border-left: 4px solid var(--error);
+        }
+
+        .success-message {
+            color: var(--success);
+            font-weight: 500;
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 200, 83, 0.1);
+            border-radius: var(--border-radius);
+            display: none;
+            border-left: 4px solid var(--success);
+        }
+
+        .preview-container {
+            margin-top: 35px;
+            display: none;
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .preview-video {
+            width: 100%;
+            height: 500px;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            background: #000;
+        }
+
+        .preview-video iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 1rem;
+            max-width: 700px;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            margin-top: 15px;
+        }
+
+        .footer-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .footer-link:hover {
+            color: var(--primary);
+        }
+
+        @media (max-width: 900px) {
+            .input-area {
+                flex-direction: column;
+            }
+            
+            .video-header {
+                flex-direction: column;
+            }
+            
+            .video-thumbnail {
+                flex: 0 0 100%;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .container {
+                padding: 25px;
+            }
+            
+            .header h1 {
+                font-size: 2.3rem;
+            }
+            
+            .preview-video {
+                height: 350px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+            
+            input, button {
+                padding: 15px;
+            }
+            
+            .video-title {
+                font-size: 1.5rem;
+            }
+            
+            .preview-video {
+                height: 250px;
+            }
+        }
+
+        .shorts-badge {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+
+        .download-options {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--light-dark);
+            padding: 25px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            z-index: 1000;
+            width: 90%;
+            max-width: 450px;
+        }
+
+        .download-options h3 {
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 1.5rem;
+        }
+
+        .download-options button {
+            width: 100%;
+            margin: 12px 0;
+            padding: 15px;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 999;
+        }
+
+        .download-status {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--light-dark);
+            padding: 25px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            z-index: 1001;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .download-status .spinner {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 20px;
+        }
+
+        .download-status p {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        .countdown {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">
+                <i class="fas fa-download"></i>
+            </div>
+        </div>
+        <h1>YouTube Videos Downloader</h1>
+        <p>Download any YouTube video or Short in the highest quality available</p>
+        <div class="badge">
+            <i class="fas fa-bolt"></i> Fast & Reliable Downloads
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="input-area">
+            <input type="text" id="url-input" placeholder="Paste YouTube or Shorts URL here (e.g., https://www.youtube.com/watch?v=... or https://youtube.com/shorts/...)">
+            <button id="fetch-btn">
+                <i class="fas fa-cloud-download-alt"></i>
+                <span>Get Video Info</span>
+            </button>
+        </div>
+
+        <div class="loader-overlay" id="loader">
+            <div class="spinner"></div>
+            <div class="loader-text">Fetching video information...</div>
+            <div class="loader-sub">This may take a few moments depending on the video length</div>
+        </div>
+
+        <div class="error-message" id="error-message"></div>
+        <div class="success-message" id="success-message"></div>
+
+        <div class="video-info" id="video-info">
+            <div class="video-header">
+                <div class="video-thumbnail">
+                    <img id="video-thumb" alt="Video thumbnail">
+                </div>
+                <div class="video-details">
+                    <h2 class="video-title" id="video-title"></h2>
+                    <div class="video-meta" id="video-meta"></div>
+                    <div class="action-buttons">
+                        <button class="action-btn download-btn" id="download-best">
+                            <i class="fas fa-download"></i>
+                            <span>Download Best Quality</span>
+                        </button>
+                        <button class="action-btn" id="preview-btn">
+                            <i class="fas fa-play-circle"></i>
+                            <span>Preview Video</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <h3>Available Formats:</h3>
+            <table class="formats-table">
+                <thead>
+                    <tr>
+                        <th>Quality</th>
+                        <th>Format</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="formats-table-body"></tbody>
+            </table>
+        </div>
+
+        <div class="preview-container" id="preview-container">
+            <div class="preview-header">
+                <h3>Video Preview</h3>
+                <button class="action-btn" id="close-preview">
+                    <i class="fas fa-times"></i>
+                    <span>Close Preview</span>
+                </button>
+            </div>
+            <div class="preview-video">
+                <iframe id="preview-video" frameborder="0" allowfullscreen></iframe>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+
+    <div class="download-options" id="download-options">
+        <h3>Download Options</h3>
+        <button class="action-btn download-btn" id="direct-download">
+            <i class="fas fa-download"></i>
+            <span>Direct Download</span>
+        </button>
+        <button class="action-btn" id="cancel-download">
+            <i class="fas fa-times"></i>
+            <span>Cancel</span>
+        </button>
+    </div>
+
+    <div class="download-status" id="download-status">
+        <div class="spinner"></div>
+        <p>Preparing your download, please wait...</p>
+        <div class="countdown" id="countdown">60</div>
+    </div>
+
+    <div class="footer">
+        <p>Note: Downloading copyrighted content without permission may violate terms of service. Use responsibly.</p>
+        <div class="footer-links">
+            <a href="#" class="footer-link">Privacy Policy</a>
+            <a href="#" class="footer-link">Terms of Service</a>
+            <a href="#" class="footer-link">Contact</a>
+        </div>
+        <p>© 2025 YouTube Videos Downloader</p>
+    </div>
+
+    <script>
+        // DOM Elements
+        const urlInput = document.getElementById('url-input');
+        const fetchBtn = document.getElementById('fetch-btn');
+        const loader = document.getElementById('loader');
+        const errorMessage = document.getElementById('error-message');
+        const successMessage = document.getElementById('success-message');
+        const videoInfo = document.getElementById('video-info');
+        const videoThumb = document.getElementById('video-thumb');
+        const videoTitle = document.getElementById('video-title');
+        const videoMeta = document.getElementById('video-meta');
+        const downloadBestBtn = document.getElementById('download-best');
+        const previewBtn = document.getElementById('preview-btn');
+        const formatsTableBody = document.getElementById('formats-table-body');
+        const previewContainer = document.getElementById('preview-container');
+        const previewVideo = document.getElementById('preview-video');
+        const closePreviewBtn = document.getElementById('close-preview');
+        const overlay = document.getElementById('overlay');
+        const downloadOptions = document.getElementById('download-options');
+        const directDownload = document.getElementById('direct-download');
+        const cancelDownload = document.getElementById('cancel-download');
+        const downloadStatus = document.getElementById('download-status');
+        const countdown = document.getElementById('countdown');
+
+        // Current video data
+        let currentVideoData = null;
+        let countdownInterval = null;
+
+        // Event Listeners
+        fetchBtn.addEventListener('click', fetchVideoInfo);
+        urlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') fetchVideoInfo();
+        });
+        downloadBestBtn.addEventListener('click', () => showDownloadOptions('best'));
+        previewBtn.addEventListener('click', previewVideoHandler);
+        closePreviewBtn.addEventListener('click', closePreview);
+        directDownload.addEventListener('click', handleDirectDownload);
+        cancelDownload.addEventListener('click', closeDownloadOptions);
+        overlay.addEventListener('click', closeDownloadOptions);
+
+        // Show/hide loader
+        function showLoader() {
+            loader.style.display = 'flex';
+            fetchBtn.disabled = true;
+        }
+
+        function hideLoader() {
+            loader.style.display = 'none';
+            fetchBtn.disabled = false;
+        }
+
+        // Show/hide error message
+        function showError(message) {
+            let displayMessage = message;
+            if (message.includes("No playable video formats found")) {
+                displayMessage = "Is video mein download ke liye formats available nahi hain. Koi aur video try karein.";
+            } else if (message.includes("FFmpeg error")) {
+                displayMessage = "Video processing mein server issue. Thodi der baad try karein ya support se contact karein.";
+            } else if (message.includes("ECONNRESET")) {
+                displayMessage = "Network connection issue. Internet check karein aur dobara try karein.";
+            }
+            errorMessage.textContent = displayMessage;
+            errorMessage.style.display = 'block';
+            successMessage.style.display = 'none';
+        }
+
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+
+        // Show/hide success message
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            errorMessage.style.display = 'none';
+        }
+
+        function hideSuccess() {
+            successMessage.style.display = 'none';
+        }
+
+        // Validate YouTube URL (including Shorts)
+        function isValidYouTubeUrl(url) {
+            const pattern = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
+            return pattern.test(url);
+        }
+
+        // Extract video ID from URL (including Shorts)
+        function extractVideoId(url) {
+            // Regular YouTube watch URL
+            let regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+            let match = url.match(regExp);
+            if (match && match[7].length === 11) {
+                return match[7];
+            }
+            
+            // YouTube Shorts URL
+            if (url.includes('youtube.com/shorts/') || url.includes('youtu.be/shorts/')) {
+                regExp = /^.*(youtube\.com\/shorts\/|youtu.be\/shorts\/)([^#&?]*).*/;
+                match = url.match(regExp);
+                if (match && match[2].length === 11) {
+                    return match[2];
+                }
+            }
+            
+            // youtu.be shortened URL
+            regExp = /^.*(youtu.be\/)([^#&?]*).*/;
+            match = url.match(regExp);
+            if (match && match[2].length === 11) {
+                return match[2];
+            }
+            
+            return false;
+        }
+
+        // Fetch video info from our server
+        function fetchVideoInfo() {
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                showError('Please enter a YouTube URL');
+                return;
+            }
+            
+            if (!isValidYouTubeUrl(url)) {
+                showError('Please enter a valid YouTube URL');
+                return;
+            }
+            
+            hideError();
+            showLoader();
+            
+            // Extract video ID
+            const videoId = extractVideoId(url);
+            
+            if (!videoId) {
+                hideLoader();
+                showError('Could not extract video ID from the URL');
+                return;
+            }
+            
+            // Use our server API to get video info
+            fetch(`/api/info?url=${encodeURIComponent(url)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch video info from server');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Display video info
+                    currentVideoData = {
+                        data: data,
+                        videoId: videoId,
+                        url: url,
+                        isShorts: url.includes('shorts/')
+                    };
+                    
+                    displayVideoInfo(currentVideoData);
+                    showSuccess('Video information loaded successfully!');
+                    
+                    // Hide success message after 3 seconds
+                    setTimeout(hideSuccess, 3000);
+                })
+                .catch(error => {
+                    showError(`Error: ${error.message}. Please check the URL and try again.`);
+                })
+                .finally(() => {
+                    hideLoader();
+                });
+        }
+
+        // Display video info
+        function displayVideoInfo(videoData) {
+            const { data, videoId, url, isShorts } = videoData;
+            
+            // Set thumbnail (highest quality available)
+            const thumbUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+            
+            // Fallback to high quality if maxres is not available
+            const img = new Image();
+            img.onload = function() {
+                if (img.naturalWidth === 120) {
+                    videoThumb.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+                } else {
+                    videoThumb.src = thumbUrl;
+                }
+            };
+            img.src = thumbUrl;
+            
+            videoTitle.innerHTML = data.title + (isShorts ? '<span class="shorts-badge">SHORTS</span>' : '');
+            
+            // Set video metadata
+            videoMeta.innerHTML = `
+                <div class="meta-item"><i class="fas fa-user"></i> ${data.author}</div>
+                <div class="meta-item"><i class="fas fa-clock"></i> ${Math.floor(data.lengthSeconds / 60)}:${(data.lengthSeconds % 60).toString().padStart(2, '0')}</div>
+                <div class="meta-item"><i class="fas fa-link"></i> ${isShorts ? 'YouTube Shorts' : 'YouTube Video'}</div>
+            `;
+            
+            // Populate formats table with real data from server
+            formatsTableBody.innerHTML = '';
+            data.formats.forEach(format => {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td>
+                        <span class="quality-badge">${format.qualityLabel}</span>
+                    </td>
+                    <td>${format.container.toUpperCase()}</td>
+                    <td>
+                        <button class="action-btn download-btn" data-itag="${format.itag}">
+                            <i class="fas fa-download"></i>
+                            Download
+                        </button>
+                    </td>
+                `;
+                
+                formatsTableBody.appendChild(row);
+                
+                // Add event listener to the download button
+                const downloadBtn = row.querySelector('.download-btn');
+                downloadBtn.addEventListener('click', () => {
+                    showDownloadOptions(format.itag);
+                });
+            });
+            
+            videoInfo.style.display = 'block';
+        }
+
+        // Show download options
+        function showDownloadOptions(itag) {
+            downloadOptions.style.display = 'block';
+            overlay.style.display = 'block';
+            
+            // Store the current itag selection
+            downloadOptions.setAttribute('data-itag', itag);
+        }
+
+        // Close download options
+        function closeDownloadOptions() {
+            downloadOptions.style.display = 'none';
+            overlay.style.display = 'none';
+        }
+
+        // Handle direct download
+        function handleDirectDownload() {
+            const itag = downloadOptions.getAttribute('data-itag');
+            closeDownloadOptions();
+            startDownloadCountdown(itag);
+        }
+
+        // Start download countdown
+        function startDownloadCountdown(itag) {
+            let seconds = 60; // Changed to 60 seconds
+            downloadStatus.style.display = 'block';
+            overlay.style.display = 'block';
+            countdown.textContent = seconds;
+            downloadStatus.querySelector('p').textContent = 'Preparing your download, please wait...';
+            
+            // Start countdown
+            countdownInterval = setInterval(() => {
+                seconds--;
+                countdown.textContent = seconds;
+                
+                // Trigger download at 50th second to account for server processing
+                if (seconds === 10) {
+                    triggerDirectDownload(itag);
+                }
+                
+                if (seconds <= 0) {
+                    clearInterval(countdownInterval);
+                    downloadStatus.style.display = 'none';
+                    overlay.style.display = 'none';
+                    showSuccess('Download started successfully!');
+                    setTimeout(hideSuccess, 5000);
+                }
+            }, 1000);
+        }
+
+        // Trigger direct download
+        function triggerDirectDownload(itag) {
+            // Create a download link to our server's download endpoint
+            const link = document.createElement('a');
+            link.href = `/api/download?url=${encodeURIComponent(currentVideoData.url)}&itag=${itag}`;
+            link.download = 'true';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Preview video
+        function previewVideoHandler() {
+            const url = urlInput.value.trim();
+            const videoId = extractVideoId(url);
+            
+            if (!videoId) {
+                showError('Please enter a valid YouTube URL first');
+                return;
+            }
+            
+            // Set up the embed URL for the iframe
+            previewVideo.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+            
+            // Show the preview container
+            previewContainer.style.display = 'block';
+            
+            // Scroll to preview
+            previewContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Close preview
+        function closePreview() {
+            previewVideo.src = '';
+            previewContainer.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
