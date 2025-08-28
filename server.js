@@ -43,39 +43,58 @@ app.get("/api/info", async (req, res) => {
     // Use ytdl-core to fetch video info
     const info = await ytdl.getInfo(url);
 
-    // Extract video formats (only formats with both audio and video)
-    const videoFormats = info.formats
-      .filter(f => f.hasVideo && f.hasAudio && (f.container === 'mp4' || f.mimeType?.includes('mp4')))
+    // Get all available formats (both video and audio)
+    const allFormats = info.formats
+      .filter(f => f.hasVideo || f.hasAudio)
       .map(f => ({
         itag: f.itag.toString(),
-        qualityLabel: f.qualityLabel || `${f.height}p`,
-        hasVideo: true,
-        hasAudio: true,
-        container: "mp4",
+        qualityLabel: f.qualityLabel || (f.hasVideo ? `${f.height}p` : 'audio'),
+        hasVideo: f.hasVideo,
+        hasAudio: f.hasAudio,
+        container: f.container,
         bitrate: f.bitrate,
-        url: f.url
+        url: f.url,
+        quality: f.quality,
+        audioQuality: f.audioQuality
       }));
 
-    if (!videoFormats.length) {
-      console.error("No valid MP4 video formats with audio found");
-      return res.status(400).json({ error: "No playable video formats found for this video" });
+    if (!allFormats.length) {
+      console.error("No valid formats found");
+      return res.status(400).json({ error: "No playable formats found for this video" });
     }
 
-    // Remove duplicates and sort by quality (high to low)
+    // Remove duplicates and sort by quality
     const uniqueFormats = [];
     const seen = new Set();
     
-    for (const f of videoFormats) {
-      const key = f.qualityLabel;
+    for (const f of allFormats) {
+      const key = `${f.qualityLabel}-${f.hasAudio}-${f.hasVideo}`;
       if (!seen.has(key)) {
         seen.add(key);
         uniqueFormats.push(f);
       }
     }
 
+    // Sort formats: video with audio first, then video only, then audio only
     uniqueFormats.sort((a, b) => {
-      const getQualityNum = (str) => parseInt(str) || 0;
-      return getQualityNum(b.qualityLabel) - getQualityNum(a.qualityLabel);
+      // Both have video and audio
+      if (a.hasVideo && a.hasAudio && b.hasVideo && b.hasAudio) {
+        return (b.bitrate || 0) - (a.bitrate || 0);
+      }
+      // A has video and audio, B doesn't
+      if (a.hasVideo && a.hasAudio) return -1;
+      // B has video and audio, A doesn't
+      if (b.hasVideo && b.hasAudio) return 1;
+      // Both video only
+      if (a.hasVideo && !a.hasAudio && b.hasVideo && !b.hasAudio) {
+        return (b.bitrate || 0) - (a.bitrate || 0);
+      }
+      // A is video only, B is audio only
+      if (a.hasVideo && !a.hasAudio) return -1;
+      // B is video only, A is audio only
+      if (b.hasVideo && !b.hasAudio) return 1;
+      // Both audio only
+      return (b.bitrate || 0) - (a.bitrate || 0);
     });
 
     const responseData = {
@@ -135,11 +154,11 @@ app.get("/api/download", async (req, res) => {
     if (!itag || itag === "best") {
       // Best quality: prefer highest with audio
       selectedFormat = ytdl.chooseFormat(info.formats, { 
-        filter: format => format.hasVideo && format.hasAudio && (format.container === 'mp4' || format.mimeType?.includes('mp4')),
+        filter: format => format.hasVideo && format.hasAudio,
         quality: 'highest' 
       });
     } else {
-      selectedFormat = info.formats.find(f => f.itag == itag && f.hasVideo && f.hasAudio);
+      selectedFormat = info.formats.find(f => f.itag == itag);
     }
 
     if (!selectedFormat || !selectedFormat.url) {
