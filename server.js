@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import ytdl from "@distube/ytdl-core";
 import path from "path";
 import { fileURLToPath } from "url";
+import { HttpsProxyAgent } from "https-proxy-agent";
 
 dotenv.config();
 
@@ -13,7 +14,11 @@ app.use(express.json());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 app.use(express.static(path.join(__dirname, "public")));
+
+// Setup proxy agent if PROXY env is set
+const agent = process.env.PROXY ? new HttpsProxyAgent(process.env.PROXY) : undefined;
 
 // In-memory cache for video info
 const videoInfoCache = new Map();
@@ -29,7 +34,6 @@ app.get("/api/info", async (req, res) => {
     if (!url || !url.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/)) {
       return res.status(400).json({ error: "Invalid YouTube URL" });
     }
-
     // Check cache first
     const cacheKey = url;
     const cachedInfo = videoInfoCache.get(cacheKey);
@@ -37,12 +41,10 @@ app.get("/api/info", async (req, res) => {
       console.log(`Serving cached info for URL: ${url}`);
       return res.json(cachedInfo.data);
     }
-
     console.log(`Fetching info for URL: ${url}`);
-    
-    // Use ytdl-core to fetch video info
-    const info = await ytdl.getInfo(url);
-
+   
+    // Use ytdl-core to fetch video info with proxy if set
+    const info = await ytdl.getInfo(url, { requestOptions: { agent } });
     // Get all available formats (both video and audio)
     const allFormats = info.formats
       .filter(f => f.hasVideo || f.hasAudio)
@@ -57,16 +59,14 @@ app.get("/api/info", async (req, res) => {
         quality: f.quality,
         audioQuality: f.audioQuality
       }));
-
     if (!allFormats.length) {
       console.error("No valid formats found");
       return res.status(400).json({ error: "No playable formats found for this video" });
     }
-
     // Remove duplicates and sort by quality
     const uniqueFormats = [];
     const seen = new Set();
-    
+   
     for (const f of allFormats) {
       const key = `${f.qualityLabel}-${f.hasAudio}-${f.hasVideo}`;
       if (!seen.has(key)) {
@@ -74,7 +74,6 @@ app.get("/api/info", async (req, res) => {
         uniqueFormats.push(f);
       }
     }
-
     // Sort formats: video with audio first, then video only, then audio only
     uniqueFormats.sort((a, b) => {
       // Both have video and audio
@@ -96,7 +95,6 @@ app.get("/api/info", async (req, res) => {
       // Both audio only
       return (b.bitrate || 0) - (a.bitrate || 0);
     });
-
     const responseData = {
       videoId: info.videoDetails.videoId,
       title: info.videoDetails.title,
@@ -106,13 +104,11 @@ app.get("/api/info", async (req, res) => {
       url: info.videoDetails.video_url,
       formats: uniqueFormats
     };
-
     // Cache the response
     videoInfoCache.set(cacheKey, {
       data: responseData,
       timestamp: Date.now()
     });
-
     res.json(responseData);
   } catch (err) {
     console.error(`Error fetching info: ${err.message}`);
@@ -125,64 +121,50 @@ app.get("/api/download", async (req, res) => {
   try {
     const url = req.query.url;
     const itag = req.query.itag;
-
     if (!url || !url.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/)) {
       return res.status(400).send("Invalid YouTube URL");
     }
-
     console.log(`Processing download for URL: ${url}, itag: ${itag || 'best'}`);
-
-    // Fetch video info using ytdl-core
-    const info = await ytdl.getInfo(url);
-
+    // Fetch video info using ytdl-core with proxy if set
+    const info = await ytdl.getInfo(url, { requestOptions: { agent } });
     // Clean title for safe filename
     const safeTitle = (info.videoDetails.title || "video")
       .replace(/[\\/:*?"<>|\r\n]/g, "")
       .replace(/[^\x20-\x7E]/g, "")
       .slice(0, 80);
-
     const filename = `${safeTitle}.mp4`;
-
     res.setHeader('Content-Type', 'video/mp4');
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${encodeURIComponent(filename)}"`
     );
-
     let selectedFormat;
-
     if (!itag || itag === "best") {
       // Best quality: prefer highest with audio
-      selectedFormat = ytdl.chooseFormat(info.formats, { 
+      selectedFormat = ytdl.chooseFormat(info.formats, {
         filter: format => format.hasVideo && format.hasAudio,
-        quality: 'highest' 
+        quality: 'highest'
       });
     } else {
       selectedFormat = info.formats.find(f => f.itag == itag);
     }
-
     if (!selectedFormat || !selectedFormat.url) {
       console.error("Selected format not found or invalid");
       return res.status(400).send("Format not found or invalid");
     }
-
     console.log(`Selected format: ${selectedFormat.qualityLabel}`);
-
     // Pipe the video stream directly to response
-    const videoStream = ytdl.downloadFromInfo(info, { format: selectedFormat });
+    const videoStream = ytdl.downloadFromInfo(info, { format: selectedFormat, requestOptions: { agent } });
     videoStream.pipe(res);
-
     videoStream.on('error', (err) => {
       console.error(`Stream error: ${err.message}`);
       if (!res.headersSent) {
         res.status(500).send("Download error");
       }
     });
-
     req.on('close', () => {
       videoStream.destroy();
     });
-
   } catch (err) {
     console.error(`Server error: ${err.message}`);
     if (!res.headersSent) {
