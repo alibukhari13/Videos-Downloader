@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import ytdl from "@distube/ytdl-core";
-import { spawn } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -44,21 +43,21 @@ app.get("/api/info", async (req, res) => {
     // Use ytdl-core to fetch video info
     const info = await ytdl.getInfo(url);
 
-    // Extract video formats (only MP4 video formats)
+    // Extract video formats (only formats with both audio and video)
     const videoFormats = info.formats
-      .filter(f => f.hasVideo && f.mimeType.startsWith("video/mp4"))
+      .filter(f => f.hasVideo && f.hasAudio && (f.container === 'mp4' || f.mimeType?.includes('mp4')))
       .map(f => ({
         itag: f.itag.toString(),
         qualityLabel: f.qualityLabel || `${f.height}p`,
         hasVideo: true,
-        hasAudio: f.hasAudio,
+        hasAudio: true,
         container: "mp4",
         bitrate: f.bitrate,
         url: f.url
       }));
 
     if (!videoFormats.length) {
-      console.error("No valid MP4 video formats found");
+      console.error("No valid MP4 video formats with audio found");
       return res.status(400).json({ error: "No playable video formats found for this video" });
     }
 
@@ -102,8 +101,8 @@ app.get("/api/info", async (req, res) => {
   }
 });
 
-// Function to handle streaming/download with merging if needed
-async function streamVideo(req, res, isDownload) {
+// Function to handle download
+app.get("/api/download", async (req, res) => {
   try {
     const url = req.query.url;
     const itag = req.query.itag;
@@ -112,7 +111,7 @@ async function streamVideo(req, res, isDownload) {
       return res.status(400).send("Invalid YouTube URL");
     }
 
-    console.log(`Processing ${isDownload ? 'download' : 'stream'} for URL: ${url}, itag: ${itag || 'best'}`);
+    console.log(`Processing download for URL: ${url}, itag: ${itag || 'best'}`);
 
     // Fetch video info using ytdl-core
     const info = await ytdl.getInfo(url);
@@ -126,22 +125,21 @@ async function streamVideo(req, res, isDownload) {
     const filename = `${safeTitle}.mp4`;
 
     res.setHeader('Content-Type', 'video/mp4');
-
-    if (isDownload) {
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${encodeURIComponent(filename)}"`
-      );
-    }
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${encodeURIComponent(filename)}"`
+    );
 
     let selectedFormat;
 
     if (!itag || itag === "best") {
-      // Best quality: prefer highest with audio, else highest video
-      selectedFormat = ytdl.chooseFormat(info.formats, { filter: 'videoandaudio', quality: 'highest' }) ||
-                       ytdl.chooseFormat(info.formats, { filter: 'videoonly', quality: 'highestvideo' });
+      // Best quality: prefer highest with audio
+      selectedFormat = ytdl.chooseFormat(info.formats, { 
+        filter: format => format.hasVideo && format.hasAudio && (format.container === 'mp4' || format.mimeType?.includes('mp4')),
+        quality: 'highest' 
+      });
     } else {
-      selectedFormat = info.formats.find(f => f.itag == itag);
+      selectedFormat = info.formats.find(f => f.itag == itag && f.hasVideo && f.hasAudio);
     }
 
     if (!selectedFormat || !selectedFormat.url) {
@@ -149,78 +147,22 @@ async function streamVideo(req, res, isDownload) {
       return res.status(400).send("Format not found or invalid");
     }
 
-    console.log(`Selected format: ${selectedFormat.qualityLabel}, hasAudio: ${selectedFormat.hasAudio}`);
+    console.log(`Selected format: ${selectedFormat.qualityLabel}`);
 
-    if (selectedFormat.hasAudio) {
-      // Direct stream if has audio
-      const videoStream = ytdl.downloadFromInfo(info, { format: selectedFormat });
-      videoStream.pipe(res);
+    // Pipe the video stream directly to response
+    const videoStream = ytdl.downloadFromInfo(info, { format: selectedFormat });
+    videoStream.pipe(res);
 
-      videoStream.on('error', (err) => {
-        console.error(`Stream error: ${err.message}`);
-        if (!res.headersSent) {
-          res.status(500).send("Download/stream error");
-        }
-      });
-
-      req.on('close', () => {
-        videoStream.destroy();
-      });
-    } else {
-      // Merge audio if no audio in format
-      let audioFormats = info.formats.filter(f => f.hasAudio && !f.hasVideo && f.mimeType.startsWith('audio/mp4'));
-      let audioCodec = 'copy';
-
-      if (!audioFormats.length) {
-        audioFormats = info.formats.filter(f => f.hasAudio && !f.hasVideo);
-        audioCodec = 'aac';
+    videoStream.on('error', (err) => {
+      console.error(`Stream error: ${err.message}`);
+      if (!res.headersSent) {
+        res.status(500).send("Download error");
       }
+    });
 
-      if (!audioFormats.length) {
-        console.error("No suitable audio format found");
-        return res.status(400).send("No suitable audio format found");
-      }
-
-      audioFormats.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-      const bestAudio = audioFormats[0];
-
-      console.log(`Merging video (${selectedFormat.qualityLabel}) with audio (bitrate: ${bestAudio.bitrate})`);
-
-      const ffmpegArgs = [
-        '-i', selectedFormat.url,
-        '-i', bestAudio.url,
-        '-c:v', 'copy',
-        '-c:a', audioCodec,
-        '-f', 'mp4',
-        '-movflags', 'frag_keyframe+empty_moov+faststart',
-        'pipe:1'
-      ];
-
-      const ffmpeg = spawn('ffmpeg', ffmpegArgs);
-
-      ffmpeg.stdout.pipe(res);
-
-      ffmpeg.stderr.on('data', (data) => {
-        console.error(`ffmpeg stderr: ${data.toString()}`);
-      });
-
-      ffmpeg.on('error', (err) => {
-        console.error(`ffmpeg error: ${err.message}`);
-        if (!res.headersSent) {
-          res.status(500).send("FFmpeg error");
-        }
-      });
-
-      ffmpeg.on('close', (code) => {
-        if (code !== 0) {
-          console.error(`ffmpeg exited with code ${code}`);
-        }
-      });
-
-      req.on('close', () => {
-        ffmpeg.kill();
-      });
-    }
+    req.on('close', () => {
+      videoStream.destroy();
+    });
 
   } catch (err) {
     console.error(`Server error: ${err.message}`);
@@ -228,11 +170,7 @@ async function streamVideo(req, res, isDownload) {
       res.status(500).send(`Server error: ${err.message}`);
     }
   }
-};
-
-app.get("/api/download", (req, res) => streamVideo(req, res, true));
-
-app.get("/api/stream", (req, res) => streamVideo(req, res, false));
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
