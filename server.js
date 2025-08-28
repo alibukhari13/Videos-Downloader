@@ -4,30 +4,19 @@ import dotenv from "dotenv";
 import ytdl from "@distube/ytdl-core";
 import path from "path";
 import { fileURLToPath } from "url";
-import { HttpsProxyAgent } from "https-proxy-agent";
-
 dotenv.config();
-
 const app = express();
 app.use(cors());
 app.use(express.json());
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 app.use(express.static(path.join(__dirname, "public")));
-
-// Setup proxy agent if PROXY env is set
-const agent = process.env.PROXY ? new HttpsProxyAgent(process.env.PROXY) : undefined;
-
 // In-memory cache for video info
 const videoInfoCache = new Map();
 const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
-
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, ts: new Date().toISOString() });
 });
-
 app.get("/api/info", async (req, res) => {
   try {
     const url = req.query.url;
@@ -43,8 +32,8 @@ app.get("/api/info", async (req, res) => {
     }
     console.log(`Fetching info for URL: ${url}`);
    
-    // Use ytdl-core to fetch video info with proxy if set
-    const info = await ytdl.getInfo(url, { requestOptions: { agent } });
+    // Use ytdl-core to fetch video info
+    const info = await ytdl.getInfo(url);
     // Get all available formats (both video and audio)
     const allFormats = info.formats
       .filter(f => f.hasVideo || f.hasAudio)
@@ -115,7 +104,6 @@ app.get("/api/info", async (req, res) => {
     res.status(500).json({ error: `Failed to fetch video info: ${err.message}` });
   }
 });
-
 // Function to handle download
 app.get("/api/download", async (req, res) => {
   try {
@@ -125,8 +113,8 @@ app.get("/api/download", async (req, res) => {
       return res.status(400).send("Invalid YouTube URL");
     }
     console.log(`Processing download for URL: ${url}, itag: ${itag || 'best'}`);
-    // Fetch video info using ytdl-core with proxy if set
-    const info = await ytdl.getInfo(url, { requestOptions: { agent } });
+    // Fetch video info using ytdl-core
+    const info = await ytdl.getInfo(url);
     // Clean title for safe filename
     const safeTitle = (info.videoDetails.title || "video")
       .replace(/[\\/:*?"<>|\r\n]/g, "")
@@ -154,7 +142,7 @@ app.get("/api/download", async (req, res) => {
     }
     console.log(`Selected format: ${selectedFormat.qualityLabel}`);
     // Pipe the video stream directly to response
-    const videoStream = ytdl.downloadFromInfo(info, { format: selectedFormat, requestOptions: { agent } });
+    const videoStream = ytdl.downloadFromInfo(info, { format: selectedFormat });
     videoStream.pipe(res);
     videoStream.on('error', (err) => {
       console.error(`Stream error: ${err.message}`);
@@ -173,7 +161,11 @@ app.get("/api/download", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`YT Downloader running: http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`YT Downloader running: http://localhost:${PORT}`);
+  });
+}
+
+export default app;
