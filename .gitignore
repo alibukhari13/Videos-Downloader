@@ -1,6 +1,7 @@
 # Node modules
 yt-dlp
 node_modules/
+node_modules/ .env
 
 # Logs
 npm-debug.log*
