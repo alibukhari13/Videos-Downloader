@@ -72,7 +72,7 @@ app.get("/api/info", async (req, res) => {
     console.log(`Fetching info for URL: ${url}`);
 
     // Use yt-dlp-wrap to get video info
-    const videoInfo = await ytDlp.getVideoInfo([url, "--no-playlist"]);
+    const videoInfo = await ytDlp.getVideoInfo([url, "--no-playlist", "--no-check-certificate"]);
 
     // Filter formats to include only muxed mp4 formats (video + audio)
     const formats = videoInfo.formats
@@ -151,7 +151,7 @@ app.get("/api/download", async (req, res) => {
     console.log(`Processing download for URL: ${url}, itag: ${itag || "best"}`);
 
     // Get video info to extract title
-    const videoInfo = await ytDlp.getVideoInfo([url, "--no-playlist"]);
+    const videoInfo = await ytDlp.getVideoInfo([url, "--no-playlist", "--no-check-certificate"]);
 
     // Clean title for safe filename
     const safeTitle = (videoInfo.title || "video")

@@ -7,25 +7,29 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <h1>YouTube Video Downloader</h1>
-  <input type="text" id="url-input" placeholder="Enter YouTube URL">
-  <button onclick="fetchVideoInfo()">Get Video Info</button>
-  <div id="error" style="color: red;"></div>
-  <div id="video-info"></div>
-  <div id="countdown"></div>
-  <table id="formats-table">
-    <thead>
-      <tr>
-        <th>Quality</th>
-        <th>Container</th>
-        <th>Video</th>
-        <th>Audio</th>
-        <th>File Size</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <div class="container">
+    <h1>YouTube Video Downloader</h1>
+    <div class="input-group">
+      <input type="text" id="url-input" placeholder="Enter YouTube URL" aria-label="YouTube URL">
+      <button onclick="fetchVideoInfo()">Get Video Info</button>
+    </div>
+    <div id="error" class="error"></div>
+    <div id="video-info"></div>
+    <div id="countdown" class="countdown"></div>
+    <table id="formats-table">
+      <thead>
+        <tr>
+          <th>Quality</th>
+          <th>Container</th>
+          <th>Video</th>
+          <th>Audio</th>
+          <th>File Size</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
   <script src="/script.js"></script>
 </body>
 </html>

@@ -23,7 +23,7 @@ async function fetchVideoInfo() {
       <h2>${data.title}</h2>
       <p><strong>Uploader:</strong> ${data.author}</p>
       <p><strong>Duration:</strong> ${Math.floor(data.lengthSeconds / 60)}:${(data.lengthSeconds % 60).toString().padStart(2, "0")}</p>
-      <img src="${data.thumbnails[0]?.url}" alt="Thumbnail" style="max-width: 200px;">
+      <img src="${data.thumbnails[0]?.url}" alt="Thumbnail" class="thumbnail">
     `;
 
     // Populate formats table

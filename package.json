@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "node server.js",
-    "dev": "NODE_ENV=development node server.js"
+    "start": "node index.js",
+    "dev": "NODE_ENV=development node index.js"
   },
   "dependencies": {
     "yt-dlp-wrap": "^2.3.0",
