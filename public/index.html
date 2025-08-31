@@ -725,19 +725,28 @@
         }
 
         // Show/hide error message
-        function showError(message) {
-            let displayMessage = message;
-            if (message.includes("No playable video formats found")) {
-                displayMessage = "Is video mein download ke liye formats available nahi hain. Koi aur video try karein.";
-            } else if (message.includes("FFmpeg error")) {
-                displayMessage = "Video processing mein server issue. Thodi der baad try karein ya support se contact karein.";
-            } else if (message.includes("ECONNRESET")) {
-                displayMessage = "Network connection issue. Internet check karein aur dobara try karein.";
-            }
-            errorMessage.textContent = displayMessage;
-            errorMessage.style.display = 'block';
-            successMessage.style.display = 'none';
-        }
+       function showError(message) {
+  let displayMessage = message;
+  
+  if (message.includes("Private video")) {
+    displayMessage = "Yeh video private hai aur download nahi ho sakti.";
+  } else if (message.includes("Members-only")) {
+    displayMessage = "Yeh members-only video hai aur download nahi ho sakti.";
+  } else if (message.includes("No downloadable formats")) {
+    displayMessage = "Is video ke liye koi bhi downloadable format available nahi hai.";
+  } else if (message.includes("No playable video formats found")) {
+    displayMessage = "Is video mein download ke liye formats available nahi hain. Koi aur video try karein.";
+  } else if (message.includes("ECONNRESET")) {
+    displayMessage = "Network connection issue. Internet check karein aur dobara try karein.";
+  }
+  
+  errorMessage.textContent = displayMessage;
+  errorMessage.style.display = 'block';
+  successMessage.style.display = 'none';
+  
+  // Auto-hide error after 10 seconds
+  setTimeout(hideError, 10000);
+}
 
         function hideError() {
             errorMessage.style.display = 'none';
