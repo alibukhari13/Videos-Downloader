@@ -24,9 +24,10 @@ const binaryPath = process.env.NODE_ENV === "production" ? "/tmp/yt-dlp" : "./yt
 async function initYtDlp() {
   try {
     // Check if yt-dlp binary exists
+    console.log(`Checking for yt-dlp binary at ${binaryPath}`);
     await fs.access(binaryPath);
     ytDlp = new YTDlpWrap(binaryPath);
-    console.log("yt-dlp initialized at", binaryPath);
+    console.log("yt-dlp initialized successfully at", binaryPath);
     // Verify yt-dlp works
     const version = await execPromise(`${binaryPath} --version`);
     console.log(`yt-dlp version: ${version.stdout.trim()}`);
@@ -38,15 +39,19 @@ async function initYtDlp() {
     } else {
       console.log("Attempting to download yt-dlp for production...");
       try {
+        console.log("Downloading yt-dlp from GitHub...");
         await execPromise(
-          `curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ${binaryPath} --retry 3 --retry-delay 5`
+          `curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ${binaryPath} --retry 5 --retry-delay 10`
         );
+        console.log("Setting executable permissions for yt-dlp...");
         await execPromise(`chmod +x ${binaryPath}`);
         ytDlp = new YTDlpWrap(binaryPath);
         console.log("yt-dlp downloaded and initialized");
+        const version = await execPromise(`${binaryPath} --version`);
+        console.log(`yt-dlp version: ${version.stdout.trim()}`);
       } catch (downloadError) {
-        console.error("Failed to download yt-dlp:", downloadError.message);
-        throw new Error("Could not initialize yt-dlp. Please ensure the binary is available.");
+        console.error("Failed to download or initialize yt-dlp:", downloadError.message);
+        throw new Error(`Could not initialize yt-dlp: ${downloadError.message}`);
       }
     }
   }
@@ -139,13 +144,13 @@ app.get("/api/info", async (req, res) => {
     console.error(`Error fetching info: ${err.message}`);
     let errorMsg = `Failed to fetch video info: ${err.message}`;
     if (err.message.includes("Private video")) {
-      errorMsg = "This video is private and cannot be downloaded.";
+      errorMsg = "Yeh video private hai aur download nahi ho sakti.";
     } else if (err.message.includes("Members-only")) {
-      errorMsg = "This is a members-only video and cannot be downloaded.";
+      errorMsg = "Yeh members-only video hai aur download nahi ho sakti.";
     } else if (err.message.includes("No playable video formats")) {
-      errorMsg = "No downloadable formats with both video and audio found.";
+      errorMsg = "Koi downloadable formats video aur audio ke saath nahi mile.";
     } else if (err.message.includes("unable to download webpage")) {
-      errorMsg = "Unable to access this video. It may be age-restricted or unavailable in your region.";
+      errorMsg = "Is video tak nahi pahunch sakte. Yeh age-restricted ya aapke region mein unavailable ho sakta hai.";
     }
     res.status(500).json({ error: errorMsg });
   }
