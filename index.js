@@ -25,6 +25,7 @@ async function initYtDlp() {
   try {
     console.log(`Checking for yt-dlp binary at ${binaryPath}`);
     await fs.access(binaryPath);
+    await execPromise(`${binaryPath} --version`); // Verify binary execution
     ytDlp = new YTDlpWrap(binaryPath);
     console.log("yt-dlp initialized successfully at", binaryPath);
     const version = await execPromise(`${binaryPath} --version`);
@@ -72,7 +73,7 @@ app.get("/api/info", async (req, res) => {
     console.log(`Fetching info for URL: ${url}`);
 
     // Use yt-dlp-wrap to get video info
-    const videoInfo = await ytDlp.getVideoInfo([url, "--no-playlist", "--no-check-certificate"]);
+    const videoInfo = await ytDlp.getVideoInfo([url, "--no-playlist", "--no-check-certificate", "--socket-timeout", "5"]);
 
     // Filter formats to include only muxed mp4 formats (video + audio)
     const formats = videoInfo.formats
@@ -151,7 +152,7 @@ app.get("/api/download", async (req, res) => {
     console.log(`Processing download for URL: ${url}, itag: ${itag || "best"}`);
 
     // Get video info to extract title
-    const videoInfo = await ytDlp.getVideoInfo([url, "--no-playlist", "--no-check-certificate"]);
+    const videoInfo = await ytDlp.getVideoInfo([url, "--no-playlist", "--no-check-certificate", "--socket-timeout", "5"]);
 
     // Clean title for safe filename
     const safeTitle = (videoInfo.title || "video")
@@ -173,7 +174,7 @@ app.get("/api/download", async (req, res) => {
     }
 
     // Stream the download
-    const execEmitter = ytDlp.exec(["-f", formatOption, "-o", "-", url, "--no-part"]);
+    const execEmitter = ytDlp.exec(["-f", formatOption, "-o", "-", url, "--no-part", "--socket-timeout", "5"]);
 
     execEmitter.childProcess.stdout.pipe(res);
 
