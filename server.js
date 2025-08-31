@@ -19,7 +19,7 @@ const execPromise = promisify(exec);
 
 // yt-dlp initialization
 let ytDlp;
-const binaryPath = process.env.NODE_ENV === "production" ? "/tmp/yt-dlp" : "./yt-dlp";
+const binaryPath = process.env.NODE_ENV === "production" ? "./bin/yt-dlp" : "./yt-dlp";
 
 async function initYtDlp() {
   try {
@@ -30,31 +30,10 @@ async function initYtDlp() {
     const version = await execPromise(`${binaryPath} --version`);
     console.log(`yt-dlp version: ${version.stdout.trim()}`);
   } catch (error) {
-    console.error("yt-dlp binary not found or unusable:", error.message);
-    if (process.env.NODE_ENV !== "production") {
-      console.log("Please manually place the yt-dlp binary in the project directory and run 'chmod +x ./yt-dlp'");
-      throw new Error("yt-dlp binary missing. Please add it to the project directory.");
-    } else {
-      console.log("Attempting to download yt-dlp for production...");
-      try {
-        console.log("Downloading yt-dlp from GitHub...");
-        await execPromise(
-          `curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ${binaryPath} --retry 5 --retry-delay 10`
-        );
-        console.log("Setting executable permissions for yt-dlp...");
-        await execPromise(`chmod +x ${binaryPath}`);
-        ytDlp = new YTDlpWrap(binaryPath);
-        console.log("yt-dlp downloaded and initialized");
-        const version = await execPromise(`${binaryPath} --version`);
-        console.log(`yt-dlp version: ${version.stdout.trim()}`);
-      } catch (downloadError) {
-        console.error("Failed to download or initialize yt-dlp:", downloadError.message);
-        throw new Error(`Could not initialize yt-dlp: ${downloadError.message}`);
-      }
-    }
+    console.error("yt-dlp initialization failed:", error.message, error.stack);
+    throw new Error(`Could not initialize yt-dlp: ${error.message}`);
   }
 }
-
 
 // In-memory cache for video info
 const videoInfoCache = new Map();
@@ -76,7 +55,7 @@ app.get("/api/info", async (req, res) => {
   try {
     let url = req.query.url;
     if (!url || !url.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/)) {
-      return res.status(400).json({ error: "Invalid YouTube URL" });
+      return res.status(400).json({ error: "Invalid YouTube URL: Yeh URL valid nahi hai." });
     }
 
     // Normalize URL
@@ -93,7 +72,7 @@ app.get("/api/info", async (req, res) => {
     console.log(`Fetching info for URL: ${url}`);
 
     // Use yt-dlp-wrap to get video info
-    const videoInfo = await ytDlp.getVideoInfo(url);
+    const videoInfo = await ytDlp.getVideoInfo([url, "--no-playlist"]);
 
     // Filter formats to include only muxed mp4 formats (video + audio)
     const formats = videoInfo.formats
@@ -104,7 +83,7 @@ app.get("/api/info", async (req, res) => {
           format.acodec &&
           format.acodec !== "none" &&
           format.ext === "mp4" &&
-          format.protocol.includes("https") // Ensure downloadable via HTTPS
+          format.protocol.includes("https")
       )
       .map((format) => ({
         itag: format.format_id,
@@ -116,7 +95,7 @@ app.get("/api/info", async (req, res) => {
         filesize: format.filesize || null,
         url: format.url,
       }))
-      .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0)); // Sort by bitrate (higher quality first)
+      .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
 
     if (!formats.length) {
       throw new Error("No playable video formats with audio found");
@@ -140,7 +119,7 @@ app.get("/api/info", async (req, res) => {
 
     return res.json(responseData);
   } catch (err) {
-    console.error(`Error fetching info: ${err.message}`);
+    console.error(`Error in /api/info for URL ${req.query.url}: ${err.message}`, err.stack);
     let errorMsg = `Failed to fetch video info: ${err.message}`;
     if (err.message.includes("Private video")) {
       errorMsg = "Yeh video private hai aur download nahi ho sakti.";
@@ -150,8 +129,10 @@ app.get("/api/info", async (req, res) => {
       errorMsg = "Koi downloadable formats video aur audio ke saath nahi mile.";
     } else if (err.message.includes("unable to download webpage")) {
       errorMsg = "Is video tak nahi pahunch sakte. Yeh age-restricted ya aapke region mein unavailable ho sakta hai.";
+    } else if (err.message.includes("Could not initialize yt-dlp")) {
+      errorMsg = "Server mein yt-dlp setup nahi hua. Admin se contact karein.";
     }
-    res.status(500).json({ error: errorMsg });
+    return res.status(500).json({ error: errorMsg });
   }
 });
 
@@ -161,7 +142,7 @@ app.get("/api/download", async (req, res) => {
     const itag = req.query.itag;
 
     if (!url || !url.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/)) {
-      return res.status(400).send("Invalid YouTube URL");
+      return res.status(400).json({ error: "Invalid YouTube URL: Yeh URL valid nahi hai." });
     }
 
     // Normalize URL
@@ -170,7 +151,7 @@ app.get("/api/download", async (req, res) => {
     console.log(`Processing download for URL: ${url}, itag: ${itag || "best"}`);
 
     // Get video info to extract title
-    const videoInfo = await ytDlp.getVideoInfo(url);
+    const videoInfo = await ytDlp.getVideoInfo([url, "--no-playlist"]);
 
     // Clean title for safe filename
     const safeTitle = (videoInfo.title || "video")
@@ -186,7 +167,7 @@ app.get("/api/download", async (req, res) => {
     );
 
     // Set up download options
-    let formatOption = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"; // Prefer muxed mp4
+    let formatOption = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best";
     if (itag && itag !== "best") {
       formatOption = itag;
     }
@@ -201,16 +182,16 @@ app.get("/api/download", async (req, res) => {
     });
 
     execEmitter.on("error", (error) => {
-      console.error(`Download error: ${error}`);
+      console.error(`Download error: ${error.message}`, error.stack);
       if (!res.headersSent) {
-        res.status(500).send("Download error");
+        res.status(500).json({ error: "Download failed: Server mein error aaya." });
       }
     });
 
     execEmitter.on("close", (code) => {
       console.log(`Download closed with code ${code}`);
       if (code !== 0 && !res.headersSent) {
-        res.status(500).send("Download failed");
+        res.status(500).json({ error: "Download failed: Process terminated." });
       }
     });
 
@@ -218,9 +199,9 @@ app.get("/api/download", async (req, res) => {
       execEmitter.childProcess.kill();
     });
   } catch (err) {
-    console.error(`Server error: ${err.message}`);
+    console.error(`Server error in /api/download: ${err.message}`, err.stack);
     if (!res.headersSent) {
-      res.status(500).send(`Server error: ${err.message}`);
+      res.status(500).json({ error: `Server error: ${err.message}` });
     }
   }
 });
@@ -234,7 +215,7 @@ initYtDlp()
     });
   })
   .catch((error) => {
-    console.error("Failed to initialize yt-dlp:", error);
+    console.error("Failed to initialize yt-dlp:", error.message, error.stack);
     process.exit(1);
   });
 

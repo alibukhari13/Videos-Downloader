@@ -1,79 +1,60 @@
-// const $ = (s) => document.querySelector(s);
-// const $$ = (s) => document.querySelectorAll(s);
+async function fetchVideoInfo() {
+  const urlInput = document.getElementById("url-input").value;
+  const infoDiv = document.getElementById("video-info");
+  const formatsTable = document.getElementById("formats-table").getElementsByTagName("tbody")[0];
+  const errorDiv = document.getElementById("error");
+  const countdownDiv = document.getElementById("countdown");
 
-// // Show loader
-// function showLoader() {
-//   $("#loader").style.display = "flex";
-//   $("#fetch").disabled = true;
-// }
+  infoDiv.innerHTML = "";
+  formatsTable.innerHTML = "";
+  errorDiv.textContent = "";
+  countdownDiv.textContent = "";
 
-// // Hide loader
-// function hideLoader() {
-//   $("#loader").style.display = "none";
-//   $("#fetch").disabled = false;
-// }
+  try {
+    const response = await fetch(`/api/info?url=${encodeURIComponent(urlInput)}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Server se response nahi mila.");
+    }
+    const data = await response.json();
 
-// $("#fetch").addEventListener("click", async () => {
-//   const url = $("#url").value.trim();
-//   $("#error").textContent = "";
-//   $("#meta").style.display = "none";
-//   if (!url) {
-//     $("#error").textContent = "Please paste a valid YouTube URL";
-//     return;
-//   }
-  
-//   try {
-//     showLoader();
-//     const res = await fetch(`/api/info?url=${encodeURIComponent(url)}`);
-//     if (!res.ok) {
-//       const data = await res.json();
-//       throw new Error(data?.error || "Failed to fetch video info");
-//     }
-//     const data = await res.json();
-    
-//     $("#meta").style.display = "block";
-//     $("#title").textContent = data.title;
-//     const thumb = (data.thumbnails || []).slice(-1)[0]?.url || "";
-//     $("#thumb").src = thumb;
-//     const tbody = $("#formats tbody");
-//     tbody.innerHTML = "";
+    // Display video info
+    infoDiv.innerHTML = `
+      <h2>${data.title}</h2>
+      <p><strong>Uploader:</strong> ${data.author}</p>
+      <p><strong>Duration:</strong> ${Math.floor(data.lengthSeconds / 60)}:${(data.lengthSeconds % 60).toString().padStart(2, "0")}</p>
+      <img src="${data.thumbnails[0]?.url}" alt="Thumbnail" style="max-width: 200px;">
+    `;
 
-//     (data.formats || []).forEach(f => {
-//       const tr = document.createElement("tr");
-//       const qualityText = f.qualityLabel;
-//       tr.innerHTML = `<td>${qualityText}</td>
-//         <td><button>Download</button></td>`;
-//       tr.querySelector("button").addEventListener("click", () => {
-//         // Trigger download directly
-//         const link = document.createElement('a');
-//         link.href = `/api/download?url=${encodeURIComponent(data.url)}&itag=${f.itag}`;
-//         link.download = ''; // Empty string to use server's filename
-//         document.body.appendChild(link);
-//         link.click();
-//         document.body.removeChild(link);
-//       });
-//       tbody.appendChild(tr);
-//     });
+    // Populate formats table
+    data.formats.forEach((format) => {
+      const row = formatsTable.insertRow();
+      row.innerHTML = `
+        <td>${format.qualityLabel}</td>
+        <td>${format.container}</td>
+        <td>${format.hasVideo ? "Yes" : "No"}</td>
+        <td>${format.hasAudio ? "Yes" : "No"}</td>
+        <td>${format.filesize ? (format.filesize / 1024 / 1024).toFixed(2) + " MB" : "Unknown"}</td>
+        <td><button onclick="startDownloadCountdown('${format.itag}')">Download</button></td>
+      `;
+    });
+  } catch (err) {
+    errorDiv.textContent = err.message || "Video info fetch karne mein error aaya. URL check karein aur dobara try karein.";
+  }
+}
 
-//     $("#download-best").onclick = () => {
-//       // Trigger download for best quality
-//       const link = document.createElement('a');
-//       link.href = `/api/download?url=${encodeURIComponent(data.url)}`;
-//       link.download = ''; // Empty string to use server's filename
-//       document.body.appendChild(link);
-//       link.click();
-//       document.body.removeChild(link);
-//     };
-//   } catch (e) {
-//     $("#error").textContent = `Error: ${e.message}. Please check the URL and try again.`;
-//   } finally {
-//     hideLoader();
-//   }
-// });
+function startDownloadCountdown(itag) {
+  let seconds = 10;
+  const countdownDiv = document.getElementById("countdown");
+  countdownDiv.textContent = `Download starting in ${seconds} seconds...`;
 
-// // Add event listener for Enter key in input field
-// $("#url").addEventListener("keypress", (e) => {
-//   if (e.key === "Enter") {
-//     $("#fetch").click();
-//   }
-// });
+  const interval = setInterval(() => {
+    seconds--;
+    countdownDiv.textContent = `Download starting in ${seconds} seconds...`;
+    if (seconds <= 0) {
+      clearInterval(interval);
+      const urlInput = document.getElementById("url-input").value;
+      window.location.href = `/api/download?url=${encodeURIComponent(urlInput)}&itag=${itag}`;
+    }
+  }, 1000);
+}

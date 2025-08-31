@@ -4,8 +4,7 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "dev": "NODE_ENV=development node server.js",
-    "postinstall": "if [ \"$NODE_ENV\" = \"production\" ]; then curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /tmp/yt-dlp --retry 5 --retry-delay 10 && chmod +x /tmp/yt-dlp; fi"
+    "dev": "NODE_ENV=development node server.js"
   },
   "dependencies": {
     "yt-dlp-wrap": "^2.3.0",
