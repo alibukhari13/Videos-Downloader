@@ -23,12 +23,10 @@ const binaryPath = process.env.NODE_ENV === "production" ? "/tmp/yt-dlp" : "./yt
 
 async function initYtDlp() {
   try {
-    // Check if yt-dlp binary exists
     console.log(`Checking for yt-dlp binary at ${binaryPath}`);
     await fs.access(binaryPath);
     ytDlp = new YTDlpWrap(binaryPath);
     console.log("yt-dlp initialized successfully at", binaryPath);
-    // Verify yt-dlp works
     const version = await execPromise(`${binaryPath} --version`);
     console.log(`yt-dlp version: ${version.stdout.trim()}`);
   } catch (error) {
@@ -56,6 +54,7 @@ async function initYtDlp() {
     }
   }
 }
+
 
 // In-memory cache for video info
 const videoInfoCache = new Map();

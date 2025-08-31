@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "NODE_ENV=development node server.js",
-    "postinstall": "if [ \"$NODE_ENV\" = \"production\" ]; then curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /tmp/yt-dlp && chmod +x /tmp/yt-dlp; fi"
+    "postinstall": "if [ \"$NODE_ENV\" = \"production\" ]; then curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /tmp/yt-dlp --retry 5 --retry-delay 10 && chmod +x /tmp/yt-dlp; fi"
   },
   "dependencies": {
     "yt-dlp-wrap": "^2.3.0",
@@ -14,6 +14,6 @@
     "dotenv": "^16.4.5"
   },
   "engines": {
-    "node": ">=18.x"
+    "node": "18.x"
   }
 }
